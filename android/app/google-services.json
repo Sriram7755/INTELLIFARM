@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "96803411998",
+    "project_id": "intellifarm-marketplace",
+    "storage_bucket": "intellifarm-marketplace.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:96803411998:android:2b75c3da0965749c17b60f",
+        "android_client_info": {
+          "package_name": "com.example.intelli_farm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjtHOKsNvlBJMFsLOful-8Uj-07mCWsRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
