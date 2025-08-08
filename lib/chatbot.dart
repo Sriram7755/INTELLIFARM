@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:translator/translator.dart';
 
+
 class ChatbotScreen extends StatefulWidget {
   @override
   _ChatbotScreenState createState() => _ChatbotScreenState();
@@ -16,50 +17,93 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   bool isLoading = false;
   bool isTamil = false;
 
-  Future<void> sendMessage() async {
-    String userMessage = _controller.text.trim();
-    if (userMessage.isEmpty) return;
-
-    setState(() {
-      messages.add({"role": "user", "text": userMessage});
-      isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showLanguageDialog();
     });
-    _controller.clear();
-
-    try {
-      String translatedMessage = userMessage;
-      if (isTamil) {
-        translatedMessage = (await translator.translate(userMessage, from: 'ta', to: 'en')).text;
-      }
-
-      var url = Uri.parse('http://172.22.69.171:5000/chat'); // Replace with your endpoint
-      var response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"prompt": translatedMessage}),
-      );
-
-      if (response.statusCode == 200) {
-        String botReply = jsonDecode(response.body)["response"];
-        if (isTamil) {
-          botReply = (await translator.translate(botReply, from: 'en', to: 'ta')).text;
-        }
-        setState(() {
-          messages.add({"role": "bot", "text": botReply});
-        });
-      } else {
-        setState(() {
-          messages.add({"role": "bot", "text": "Error: ${response.statusCode}"});
-        });
-      }
-    } catch (e) {
-      setState(() {
-        messages.add({"role": "bot", "text": "❌ Failed to connect to server!"});
-      });
-    } finally {
-      setState(() => isLoading = false);
-    }
   }
+
+  void _showLanguageDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: Text("Choose Language"),
+        content: Text("Please select your preferred language."),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() => isTamil = false);
+              Navigator.pop(context);
+            },
+            child: Text("English"),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => isTamil = true);
+              Navigator.pop(context);
+            },
+            child: Text("தமிழ்"),
+          ),
+        ],
+      ),
+    );
+  }
+
+ Future<void> sendMessage() async {
+  String userMessage = _controller.text.trim();
+  if (userMessage.isEmpty) return;
+
+  setState(() {
+    messages.add({"role": "user", "text": userMessage});
+    isLoading = true;
+  });
+  _controller.clear();
+
+  try {
+    String processedMessage = userMessage;
+
+    // Translate to English if user selected Tamil
+    if (isTamil) {
+      processedMessage =
+          (await translator.translate(userMessage, from: 'ta', to: 'en')).text;
+    }
+
+    var url = Uri.parse('http://172.16.142.229:5000/chat'); // your backend URL
+    var response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"prompt": processedMessage}),
+    );
+
+    if (response.statusCode == 200) {
+      String botReply = jsonDecode(response.body)["response"];
+
+      // Only translate response to Tamil if user selected Tamil
+      if (isTamil) {
+        botReply =
+            (await translator.translate(botReply, from: 'en', to: 'ta')).text;
+      }
+
+      setState(() {
+        messages.add({"role": "bot", "text": botReply});
+      });
+    } else {
+      setState(() {
+        messages.add({"role": "bot", "text": "Error: ${response.statusCode}"});
+      });
+    }
+  } catch (e) {
+    setState(() {
+      messages.add({"role": "bot", "text": "❌ Failed to connect to server!"});
+    });
+  } finally {
+    setState(() => isLoading = false);
+  }
+}
+
 
   Widget buildMessageBubble(String text, bool isUser) {
     return Align(
@@ -84,13 +128,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Farmer Chatbot"),
-        actions: [
-          IconButton(
-            icon: Icon(isTamil ? Icons.language : Icons.translate),
-            onPressed: () => setState(() => isTamil = !isTamil),
-            tooltip: isTamil ? "Switch to English" : "Switch to Tamil",
-          ),
-        ],
+        backgroundColor: Color(0xFF4CAF50),
       ),
       body: Column(
         children: [
@@ -109,10 +147,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         Text("Typing..."),
                       ],
                     ),
-                  );  
+                  );
                 }
                 final msg = messages[index];
-                return buildMessageBubble(msg["text"]!, msg["role"] == "user");
+                return buildMessageBubble(
+                    msg["text"]!, msg["role"] == "user");
               },
             ),
           ),
@@ -126,8 +165,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => sendMessage(),
                     decoration: InputDecoration(
-                      hintText: isTamil ? "எதை கேட்க விரும்புகிறீர்கள்?" : "Ask something...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      hintText: isTamil
+                          ? "எதை கேட்க விரும்புகிறீர்கள்?"
+                          : "Ask something...",
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       filled: true,
                       fillColor: Colors.white,
                     ),
