@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'location_picker_page.dart'; // Import your LocationPickerPage
 
 class RequestOrderPage extends StatefulWidget {
   @override
@@ -11,9 +13,12 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
   final _formKey = GlobalKey<FormState>();
   final dateController = TextEditingController();
   final timeController = TextEditingController();
-  final pickupController = TextEditingController();
-  final dropController = TextEditingController();
   final loadController = TextEditingController();
+
+  LatLng? pickupLatLng;
+  String pickupAddress = '';
+  LatLng? dropLatLng;
+  String dropAddress = '';
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +37,28 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
             children: [
               _buildDatePickerField(dateController, "Date", Icons.date_range),
               _buildInputField(icon: Icons.access_time, controller: timeController, label: "Time"),
-              _buildInputField(icon: Icons.location_on, controller: pickupController, label: "Pickup Location"),
-              _buildInputField(icon: Icons.location_searching, controller: dropController, label: "Drop Location"),
+
+              // Pickup location picker
+              ListTile(
+                leading: Icon(Icons.location_on, color: Colors.green),
+                title: Text(pickupAddress.isEmpty ? "Select Pickup Location" : pickupAddress),
+                trailing: Icon(Icons.map),
+                onTap: () => _handleLocationSelect(isPickup: true),
+              ),
+              SizedBox(height: 10),
+
+              // Drop location picker
+              ListTile(
+                leading: Icon(Icons.location_searching, color: Colors.blue),
+                title: Text(dropAddress.isEmpty ? "Select Drop Location" : dropAddress),
+                trailing: Icon(Icons.map),
+                onTap: () => _handleLocationSelect(isPickup: false),
+              ),
+              SizedBox(height: 10),
+
               _buildInputField(icon: Icons.local_shipping, controller: loadController, label: "Load Details"),
               SizedBox(height: 30),
+
               ElevatedButton.icon(
                 icon: Icon(Icons.send),
                 label: Text("Send Request"),
@@ -46,14 +69,18 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
                   backgroundColor: Colors.green[700],
                 ),
                 onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
+                  if (_formKey.currentState!.validate() && pickupLatLng != null && dropLatLng != null) {
                     await FirebaseFirestore.instance.collection('driver_requests').add({
                       'from': FirebaseAuth.instance.currentUser!.uid,
                       'to': driver.id,
                       'date': dateController.text,
                       'time': timeController.text,
-                      'pickup': pickupController.text,
-                      'drop': dropController.text,
+                      'pickup_address': pickupAddress,
+                      'pickup_lat': pickupLatLng!.latitude,
+                      'pickup_lng': pickupLatLng!.longitude,
+                      'drop_address': dropAddress,
+                      'drop_lat': dropLatLng!.latitude,
+                      'drop_lng': dropLatLng!.longitude,
                       'load': loadController.text,
                       'status': 'pending',
                       'timestamp': FieldValue.serverTimestamp(),
@@ -63,6 +90,10 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
                       SnackBar(content: Text("Request sent successfully")),
                     );
                     Navigator.pop(context);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please select both pickup and drop locations")),
+                    );
                   }
                 },
               ),
@@ -73,7 +104,31 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
     );
   }
 
-  // Common Input Field
+  Future<void> _handleLocationSelect({required bool isPickup}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(
+          initialLocation: isPickup
+              ? pickupLatLng ?? const LatLng(20.5937, 78.9629)
+              : dropLatLng ?? const LatLng(20.5937, 78.9629),
+        ),
+      ),
+    );
+
+    if (result != null && result is Map) {
+      setState(() {
+        if (isPickup) {
+          pickupLatLng = LatLng(result['lat'], result['lng']);
+          pickupAddress = result['address'] ?? '';
+        } else {
+          dropLatLng = LatLng(result['lat'], result['lng']);
+          dropAddress = result['address'] ?? '';
+        }
+      });
+    }
+  }
+
   Widget _buildInputField({
     required IconData icon,
     required TextEditingController controller,
@@ -94,7 +149,6 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
     );
   }
 
-  // Date Picker Field
   Widget _buildDatePickerField(TextEditingController controller, String label, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -109,14 +163,12 @@ class _RequestOrderPageState extends State<RequestOrderPage> {
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         onTap: () async {
-          FocusScope.of(context).requestFocus(FocusNode()); // Dismiss keyboard
           DateTime? pickedDate = await showDatePicker(
             context: context,
             initialDate: DateTime.now(),
             firstDate: DateTime.now(),
             lastDate: DateTime(2100),
           );
-
           if (pickedDate != null) {
             controller.text = "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
           }

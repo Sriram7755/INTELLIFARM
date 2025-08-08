@@ -122,12 +122,16 @@ class _DriverHomePageState extends State<DriverHomePage> with TickerProviderStat
   }
 
   Widget buildRequestCard(Map<String, dynamic> data, String id, {bool showActions = true}) {
+    // Use stored pickup_address and drop_address fields directly
+    final String pickupAddress = data['pickup_address'] ?? 'Unknown Pickup';
+    final String dropAddress = data['drop_address'] ?? 'Unknown Drop';
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        title: Text("📦 ${data['pickup']} → ${data['drop']}"),
+        title: Text("📦 $pickupAddress → $dropAddress"),
         subtitle: Text("📅 ${data['date']} at ${data['time']}\n🚚 Load: ${data['load']}"),
         trailing: showActions
             ? Row(
@@ -147,14 +151,13 @@ class _DriverHomePageState extends State<DriverHomePage> with TickerProviderStat
               )
             : Icon(Icons.check_circle, color: Colors.green),
         onTap: () {
-          if (!showActions) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OrderDetailPage(orderData: data),
-              ),
-            );
-          }
+          // Navigate to order details page on tap regardless of accepted or pending
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrderDetailPage(orderData: data),
+            ),
+          );
         },
       ),
     );
